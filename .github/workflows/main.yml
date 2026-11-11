@@ -10,7 +10,7 @@ on:
 jobs:
   build-apk:
     runs-on: ubuntu-latest
-    timeout-minutes: 10
+    timeout-minutes: 20
 
     steps:
       - name: Checkout Repository
@@ -21,42 +21,53 @@ jobs:
         with:
           node-version: '20'
 
+      - name: Set up Java (Required for Android Build)
+        uses: actions/setup-java@v4
+        with:
+          distribution: 'temurin'
+          java-version: '17'
+
       - name: Install Dependencies & Build Web App
         run: |
-          if [ -f "package.json" ]; then
-            npm install --no-audit --prefer-offline
-            if npm run | grep -q "build"; then
-              npm run build
-            else
-              echo "No 'build' script found in package.json, skipping npm run build."
-            fi
+          npm install
+          if npm run | grep -q "build"; then
+            npm run build
           else
-            echo "package.json not found, skipping npm install."
+            echo "No 'build' script found, creating dist folder..."
+            mkdir -p dist
+            cp -r index.html dist/ 2>/dev/null || true
           fi
 
-      - name: Generate or Process APK
+      - name: Initialize Capacitor and Build APK
         run: |
-          python3 -m pip install --upgrade pip
-          
-          # यदि आपके पास पाइथन स्क्रिप्ट है
-          if [ -f "scripts/customize_and_sign_apk.py" ]; then
-            echo "Running custom Python APK script..."
-            python3 scripts/customize_and_sign_apk.py
+          # यदि आपके प्रोजेक्ट में पहले से capacitor नहीं है, तो इसे जोड़ें
+          if [ ! -f "capacitor.config.json" ] && [ ! -f "capacitor.config.ts" ]; then
+            npm install @capacitor/core @capacitor/cli @capacitor/android
+            npx cap init "Digital Guardian" "com.digital.guardian" --web-dir dist
           else
-            echo "Creating output structure for Digital Guardian..."
-            mkdir -p output_apk
-            # यहाँ सुनिश्चित करें कि कोई फाइल या ज़िप/APK तैयार हो
-            echo "Digital Guardian Web Build Ready" > output_apk/read_me.txt
+            npm install
           fi
+
+          # एंड्रॉइड प्लेटफॉर्म जोड़ें और सिंक करें
+          npx cap add android || true
+          npx cap sync android
+
+          # APK जनरेट करें (Debug APK)
+          cd android
+          chmod +x gradlew
+          ./gradlew assembleDebug
+          cd ..
+
+      - name: Locate and Move APK File
+        run: |
+          mkdir -p final_apk
+          find . -name "*.apk" -exec cp {} final_apk/ \;
+          echo "Listing generated APKs:"
+          ls -la final_apk/
 
       - name: Upload APK Artifact
         uses: actions/upload-artifact@v4
         with:
-          name: DigitalGuardian-APK
-          path: |
-            *.apk
-            **/*.apk
-            dist/
-            public/
-            output_apk/
-          if-no-files-found: ignore
+          name: DigitalGuardian-Android-APK
+          path: final_apk/*.apk
+          if-no-files-found: error
