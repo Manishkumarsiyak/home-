@@ -1,0 +1,52 @@
+name: Build Digital Guardian APK
+
+on:
+  push:
+    branches: [ main, master ]
+  pull_request:
+    branches: [ main, master ]
+  workflow_dispatch:
+
+jobs:
+  build-apk:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout Repository
+        uses: actions/checkout@v4
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: 'npm'
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.10'
+
+      - name: Install Dependencies & Build Web App
+        run: |
+          npm install
+          npm run build
+
+      - name: Build & Package Android APK
+        run: |
+          python3 -m pip install --upgrade pip
+          # यदि आपके प्रोजेक्ट में APK साइनिंग/कस्टमाइजेशन स्क्रिप्ट है तो उसे चलाएं
+          if [ -f "scripts/customize_and_sign_apk.py" ]; then
+            python3 scripts/customize_and_sign_apk.py
+          else
+            echo "Building default standalone APK structure..."
+            mkdir -p public
+            # डमी या मुख्य APK जनरेशन स्टेप यहाँ जोड़ सकते हैं
+          fi
+
+      - name: Upload APK Artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: DigitalGuardian-APK
+          path: |
+            public/*.apk
+            dist/
