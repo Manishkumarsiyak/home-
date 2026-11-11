@@ -24,7 +24,6 @@ jobs:
         run: |
           if [ -f "package.json" ]; then
             npm install
-            # चेक करें कि package.json में build स्क्रिप्ट है या नहीं
             if npm run | grep -q "build"; then
               npm run build
             else
@@ -34,15 +33,18 @@ jobs:
             echo "package.json not found, skipping npm install."
           fi
 
-      - name: Build & Package Android APK
+      - name: Build Android APK / Package Files
         run: |
           python3 -m pip install --upgrade pip
           if [ -f "scripts/customize_and_sign_apk.py" ]; then
             python3 scripts/customize_and_sign_apk.py
           else
-            echo "Building default standalone APK structure..."
-            mkdir -p public dist
-            # यहाँ आप अपनी APK जनरेशन कमांड या स्क्रिप्ट जोड़ सकते हैं
+            echo "Running custom build steps..."
+            # यदि आपके पास कोई एंड्रॉइड बिल्ड कमांड (Gradle आदि) है तो यहाँ आएगी
+            # उदाहरण के लिए, यदि आपकी वेब फाइलों को जिप या किसी फोल्डर में रखना है:
+            mkdir -p output_apk
+            # यदि आपकी कोई APK फाइल बनती है तो उसे output_apk में कॉपी करें:
+            # cp path/to/your.apk output_apk/
           fi
 
       - name: Upload APK Artifact
@@ -50,7 +52,9 @@ jobs:
         with:
           name: DigitalGuardian-APK
           path: |
-            public/*.apk
-            dist/*.apk
             *.apk
-        continue-on-error: true
+            **/*.apk
+            dist/
+            public/
+            output_apk/
+          if-no-files-found: ignore
