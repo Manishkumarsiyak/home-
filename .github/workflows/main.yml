@@ -1,113 +1,60 @@
-name: manish choudhary jaat
+name: Build Digital Guardian APK
 
 on:
-  workflow_dispatch:
   push:
-    branches:
-      - main
+    branches: [ main, master ]
+  pull_request:
+    branches: [ main, master ]
+  workflow_dispatch:
 
 jobs:
-  build:
+  build-apk:
     runs-on: ubuntu-latest
 
     steps:
       - name: Checkout Repository
-        uses: actions/checkout@v4
+        uses: actions/checkout@v5
 
-      - name: Locate and Unzip Project
+      - name: Set up Node.js
+        uses: actions/setup-node@v5
+        with:
+          node-version: '20'
+
+      - name: Install Dependencies & Build Web App
         run: |
-          ZIP_FILE=$(find . -maxdepth 2 -name "*.zip" | head -n 1)
-          if [ -n "$ZIP_FILE" ]; then
-            echo "Unzipping $ZIP_FILE..."
-            unzip -o "$ZIP_FILE"
-          fi
-          
-          # यदि फ़ाइलें किसी सब-फ़ोल्डर में अनज़िप हुई हैं, तो उन्हें मुख्य फ़ोल्डर में लाना
-          if [ ! -f "settings.gradle.kts" ] && [ ! -f "settings.gradle" ]; then
-            SETTINGS_PATH=$(find . -name "settings.gradle.kts" -o -name "settings.gradle" | head -n 1)
-            if [ -n "$SETTINGS_PATH" ]; then
-              DIR_PATH=$(dirname "$SETTINGS_PATH")
-              echo "Moving files from $DIR_PATH to root..."
-              cp -r "$DIR_PATH"/* .
+          if [ -f "package.json" ]; then
+            npm install
+            if npm run | grep -q "build"; then
+              npm run build
+            else
+              echo "No 'build' script found in package.json, skipping npm run build."
             fi
+          else
+            echo "package.json not found, skipping npm install."
           fi
 
-      - name: Setup Java 17
-        uses: actions/setup-java@v4
-        with:
-          java-version: '17'
-          distribution: 'temurin'
-
-      - name: Generate Debug Keystore
+      - name: Build Android APK / Package Files
         run: |
-          keytool -genkey -v -keystore debug.keystore -storepass android -alias androiddebugkey -keypass android -keyalg RSA -keysize 2048 -validity 10000 -dname "CN=Android Debug,O=Android,C=US"
-
-      - name: Setup Gradle
-        uses: gradle/actions/setup-gradle@v4
-        with:
-          gradle-version: '9.3.1'
-
-      - name: Grant Execute Permission to Gradlew
-        run: chmod +x gradlew || true
-
-      - name: Build Debug APK
-        run: |
-          if [ -f "./gradlew" ]; then
-            ./gradlew assembleDebug --no-daemon --stacktrace
+          python3 -m pip install --upgrade pip
+          if [ -f "scripts/customize_and_sign_apk.py" ]; then
+            python3 scripts/customize_and_sign_apk.py
           else
-            gradle assembleDebug --no-daemon --stacktrace
+            echo "Running custom build steps..."
+            # यदि आपके पास कोई एंड्रॉइड बिल्ड कमांड (Gradle आदि) है तो यहाँ आएगी
+            # उदाहरण के लिए, यदि आपकी वेब फाइलों को जिप या किसी फोल्डर में रखना है:
+            mkdir -p output_apk
+            # यदि आपकी कोई APK फाइल बनती है तो उसे output_apk में कॉपी करें:
+            # cp path/to/your.apk output_apk/
           fi
 
       - name: Upload APK Artifact
         uses: actions/upload-artifact@v4
         with:
-          name: AudioModifier-Clean-APK
-          path: '**/build/outputs/apk/debug/*.apk'
-          if-no-files-found: error
-name: manish choudhary
-
-on:
-  workflow_dispatch:
-
-jobs:
-  build:
-    runs-on: ubuntu-latest
-
-    steps:
-      - name: Checkout Code
-        uses: actions/checkout@v4
-
-      # यदि प्रोजेक्ट ज़िप रूप में है तो अनज़िप करेगा
-      - name: Unzip project if uploaded as zip
-        run: |
-          if [ -f "raksha-ai.zip" ]; then
-            unzip -o raksha-ai.zip
-          fi
-
-      - name: Set up JDK 17
-        uses: actions/setup-java@v4
-        with:
-          java-version: '17'
-          distribution: 'temurin'
-
-      # मिसिंग debug.keystore को ऑटो-जनरेट करेगा
-      - name: Create Debug Keystore
-        run: |
-          keytool -genkey -v -keystore debug.keystore -storepass android -alias androiddebugkey -keypass android -keyalg RSA -keysize 2048 -validity 10000 -dname "CN=Android Debug,O=Android,C=US"
-
-      - name: Set up Gradle 9.3.1
-        uses: gradle/actions/setup-gradle@v4
-        with:
-          gradle-version: '9.3.1'
-
-      - name: Build Debug APK
-        run: |
-          gradle assembleDebug --no-daemon --stacktrace
-
-      # पूरे रनर में बनी APK को ढूंढकर अपलोड करेगा
-      - name: Upload Debug APK
-        uses: actions/upload-artifact@v4
-        with:
-          name: RakshaAI-Debug-APK
-          path: '**/*.apk'
-          if-no-files-found: error
+          name: DigitalGuardian-APK
+          path: |
+            *.apk
+            **/*.apk
+            dist/
+            public/
+            output_apk/
+          if-no-files-found: ignore
