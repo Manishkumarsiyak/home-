@@ -33,18 +33,14 @@ jobs:
             echo "package.json not found, skipping npm install."
           fi
 
-      - name: Build Android APK / Package Files
+      - name: Check for APK or Build Files
         run: |
-          python3 -m pip install --upgrade pip
+          echo "Searching for any existing APK files in the repository..."
+          find . -name "*.apk"
+          
+          # यदि आपके प्रोजेक्ट में कोई पाइथन स्क्रिप्ट है जो APK बनाती है:
           if [ -f "scripts/customize_and_sign_apk.py" ]; then
             python3 scripts/customize_and_sign_apk.py
-          else
-            echo "Running custom build steps..."
-            # यदि आपके पास कोई एंड्रॉइड बिल्ड कमांड (Gradle आदि) है तो यहाँ आएगी
-            # उदाहरण के लिए, यदि आपकी वेब फाइलों को जिप या किसी फोल्डर में रखना है:
-            mkdir -p output_apk
-            # यदि आपकी कोई APK फाइल बनती है तो उसे output_apk में कॉपी करें:
-            # cp path/to/your.apk output_apk/
           fi
 
       - name: Upload APK Artifact
@@ -56,5 +52,4 @@ jobs:
             **/*.apk
             dist/
             public/
-            output_apk/
-          if-no-files-found: ignore
+          if-no-files-found: warn
