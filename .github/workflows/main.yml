@@ -1,60 +1,47 @@
-name: Build Digital Guardian APK
+name: manish choudhary
 
 on:
-  push:
-    branches: [ main, master ]
-  pull_request:
-    branches: [ main, master ]
   workflow_dispatch:
 
 jobs:
-  build-apk:
+  build:
     runs-on: ubuntu-latest
 
     steps:
-      - name: Checkout Repository
-        uses: actions/checkout@v5
+      - name: Checkout Code
+        uses: actions/checkout@v4
 
-      - name: Set up Node.js
-        uses: actions/setup-node@v5
+      # यदि प्रोजेक्ट ज़िप रूप में है तो अनज़िप करेगा
+      - name: Unzip project if uploaded as zip
+        run: |
+          if [ -f "raksha-ai.zip" ]; then
+            unzip -o raksha-ai.zip
+          fi
+
+      - name: Set up JDK 17
+        uses: actions/setup-java@v4
         with:
-          node-version: '20'
+          java-version: '17'
+          distribution: 'temurin'
 
-      - name: Install Dependencies & Build Web App
+      # मिसिंग debug.keystore को ऑटो-जनरेट करेगा
+      - name: Create Debug Keystore
         run: |
-          if [ -f "package.json" ]; then
-            npm install
-            if npm run | grep -q "build"; then
-              npm run build
-            else
-              echo "No 'build' script found in package.json, skipping npm run build."
-            fi
-          else
-            echo "package.json not found, skipping npm install."
-          fi
+          keytool -genkey -v -keystore debug.keystore -storepass android -alias androiddebugkey -keypass android -keyalg RSA -keysize 2048 -validity 10000 -dname "CN=Android Debug,O=Android,C=US"
 
-      - name: Build Android APK / Package Files
+      - name: Set up Gradle 9.3.1
+        uses: gradle/actions/setup-gradle@v4
+        with:
+          gradle-version: '9.3.1'
+
+      - name: Build Debug APK
         run: |
-          python3 -m pip install --upgrade pip
-          if [ -f "scripts/customize_and_sign_apk.py" ]; then
-            python3 scripts/customize_and_sign_apk.py
-          else
-            echo "Running custom build steps..."
-            # यदि आपके पास कोई एंड्रॉइड बिल्ड कमांड (Gradle आदि) है तो यहाँ आएगी
-            # उदाहरण के लिए, यदि आपकी वेब फाइलों को जिप या किसी फोल्डर में रखना है:
-            mkdir -p output_apk
-            # यदि आपकी कोई APK फाइल बनती है तो उसे output_apk में कॉपी करें:
-            # cp path/to/your.apk output_apk/
-          fi
+          gradle assembleDebug --no-daemon --stacktrace
 
-      - name: Upload APK Artifact
+      # पूरे रनर में बनी APK को ढूंढकर अपलोड करेगा
+      - name: Upload Debug APK
         uses: actions/upload-artifact@v4
         with:
-          name: DigitalGuardian-APK
-          path: |
-            *.apk
-            **/*.apk
-            dist/
-            public/
-            output_apk/
-          if-no-files-found: ignore
+          name: RakshaAI-Debug-APK
+          path: '**/*.apk'
+          if-no-files-found: error
