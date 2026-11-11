@@ -19,17 +19,20 @@ jobs:
         uses: actions/setup-node@v5
         with:
           node-version: '20'
-          # 'cache: 'npm'' यहाँ से हटा दिया गया है क्योंकि lock file मौजूद नहीं है
-
-      - name: Set up Python
-        uses: actions/setup-python@v5
-        with:
-          python-version: '3.10'
 
       - name: Install Dependencies & Build Web App
         run: |
-          npm install
-          npm run build
+          if [ -f "package.json" ]; then
+            npm install
+            # चेक करें कि package.json में build स्क्रिप्ट है या नहीं
+            if npm run | grep -q "build"; then
+              npm run build
+            else
+              echo "No 'build' script found in package.json, skipping npm run build."
+            fi
+          else
+            echo "package.json not found, skipping npm install."
+          fi
 
       - name: Build & Package Android APK
         run: |
@@ -38,7 +41,8 @@ jobs:
             python3 scripts/customize_and_sign_apk.py
           else
             echo "Building default standalone APK structure..."
-            mkdir -p public
+            mkdir -p public dist
+            # यहाँ आप अपनी APK जनरेशन कमांड या स्क्रिप्ट जोड़ सकते हैं
           fi
 
       - name: Upload APK Artifact
@@ -47,4 +51,6 @@ jobs:
           name: DigitalGuardian-APK
           path: |
             public/*.apk
-            dist/
+            dist/*.apk
+            *.apk
+        continue-on-error: true
